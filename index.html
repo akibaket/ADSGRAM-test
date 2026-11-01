@@ -1,1 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>AdsGram Reward App</title>
+  
+  <!-- SDK de Telegram Mini Apps -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- SDK de AdsGram -->
+  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 text-center select-none">
+
+  <div class="w-full max-w-sm bg-slate-800/90 border border-slate-700/60 backdrop-blur-md rounded-3xl p-6 shadow-2xl flex flex-col items-center">
+    
+    <!-- Indicador de Estado del SDK -->
+    <div class="flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/50 text-xs text-slate-300">
+      <span id="sdkStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+      <span id="sdkStatusText" class="font-medium">Conectando con AdsGram...</span>
+    </div>
+
+    <!-- Saldo Principal -->
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Tu Saldo Actual</p>
+    <div class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 mb-8 tracking-tight">
+      $<span id="balance">0.00</span>
+    </div>
+
+    <!-- Mensaje Informativo -->
+    <div id="statusMessage" class="text-xs font-medium text-slate-400 min-h-[1.5rem] mb-5 flex items-center justify-center gap-1.5">
+      Haz clic en el botón para ver un anuncio
+    </div>
+
+    <!-- Botón Principal -->
+    <button 
+      id="watchAdBtn"
+      onclick="handleShowAd()"
+      disabled
+      class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-[0.98] transition-all duration-200 font-bold text-slate-950 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span>Ver Anuncio (+0.01)</span>
+    </button>
+  </div>
+
+  <script>
+    // ----------------------------------------------------
+    // CÓDIGO DE BLOQUE CONFIGURADO
+    // ----------------------------------------------------
+    const AD_BLOCK_ID = "57459";
+
+    let balance = parseFloat(localStorage.getItem('user_balance')) || 0.00;
+    let AdController = null;
+
+    const balanceEl = document.getElementById('balance');
+    const statusEl = document.getElementById('statusMessage');
+    const btnEl = document.getElementById('watchAdBtn');
+    const sdkDot = document.getElementById('sdkStatusDot');
+    const sdkText = document.getElementById('sdkStatusText');
+
+    // Inicializar visualización del saldo guardado
+    updateBalanceDisplay();
+
+    // Inicialización del Telegram Web App SDK
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+
+    // Inicialización de AdsGram
+    function initAdsGram() {
+      if (window.Adsgram) {
+        try {
+          AdController = window.Adsgram.init({ 
+            blockId: AD_BLOCK_ID,
+            debug: false // Cambia a true si quieres probar banners de simulación
+          });
+
+          sdkDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+          sdkText.textContent = "AdsGram Conectado";
+          btnEl.disabled = false;
+        } catch (err) {
+          showStatus("Error al inicializar AdsGram", "text-rose-400");
+          sdkDot.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+          sdkText.textContent = "Error de Configuración";
+        }
+      } else {
+        showStatus("No se pudo cargar el SDK de anuncios", "text-rose-400");
+        sdkDot.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+        sdkText.textContent = "Sin conexión a AdsGram";
+      }
+    }
+
+    // Llamada de inicialización al cargar la ventana
+    window.addEventListener('load', initAdsGram);
+
+    function updateBalanceDisplay() {
+      balanceEl.textContent = balance.toFixed(2);
+    }
+
+    function showStatus(text, colorClass = "text-slate-400") {
+      statusEl.textContent = text;
+      statusEl.className = `text-xs font-medium min-h-[1.5rem] mb-5 flex items-center justify-center gap-1.5 ${colorClass}`;
+    }
+
+    function handleShowAd() {
+      if (!AdController) {
+        showStatus("AdsGram no está listo aún", "text-rose-400");
+        return;
+      }
+
+      btnEl.disabled = true;
+      showStatus("Cargando anuncio...", "text-amber-400 animate-pulse");
+
+      AdController.show()
+        .then((result) => {
+          // El usuario completó el anuncio exitosamente
+          balance += 0.01;
+          localStorage.setItem('user_balance', balance.toString());
+          updateBalanceDisplay();
+
+          // Vibración de éxito nativa de Telegram
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+          }
+
+          showStatus("¡Recompensa acreditada! +$0.01", "text-emerald-400");
+        })
+        .catch((error) => {
+          // El usuario canceló, cerró antes de tiempo o no había anuncios disponibles
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+          }
+
+          if (error && error.description) {
+            showStatus(`Info: ${error.description}`, "text-amber-400");
+          } else if (error && error.error) {
+            showStatus(`Error: Anuncio no completado`, "text-rose-400");
+          } else {
+            showStatus("No se completó el anuncio", "text-rose-400");
+          }
+        })
+        .finally(() => {
+          btnEl.disabled = false;
+        });
+    }
+  </script>
+</body>
+</html>
+```
